@@ -1,7 +1,33 @@
 (() => {
   const SVG_NS = "http://www.w3.org/2000/svg";
   const SNAP_THRESHOLD = 45;
-  const SOURCE_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const SANDBOX_SOURCE_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const DIFFICULTY_CONFIGS = {
+    easy: {
+      label: "Easy",
+      minTarget: 2,
+      maxTarget: 10,
+      duration: 60,
+      trayValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      combineMax: 10,
+    },
+    normal: {
+      label: "Normal",
+      minTarget: 10,
+      maxTarget: 99,
+      duration: 90,
+      trayValues: [1, 2, 3, 4, 5, 10, 20, 30, 40, 50],
+      combineMax: 200,
+    },
+    hard: {
+      label: "Hard",
+      minTarget: 100,
+      maxTarget: 200,
+      duration: 120,
+      trayValues: [1, 2, 5, 10, 20, 25, 50, 75, 100, 200],
+      combineMax: 200,
+    },
+  };
   const BLOCK_COLORS = {
     1: "#FF1A1A",
     2: "#FF8000",
@@ -27,17 +53,39 @@
   const sandbox = document.querySelector("#sandbox");
   const trayLane = document.querySelector("#trayLane");
   const resetButton = document.querySelector("#resetButton");
+  const themeToggle = document.querySelector("#themeToggle");
+  const challengeHud = document.querySelector("#challengeHud");
+  const targetBubble = document.querySelector("#targetBubble");
+  const timerFill = document.querySelector("#timerFill");
+  const modeOverlay = document.querySelector("#modeOverlay");
+  const modeHome = document.querySelector("#modeHome");
+  const difficultyPanel = document.querySelector("#difficultyPanel");
+  const backToModesButton = document.querySelector("#backToModes");
+  const confettiLayer = document.querySelector("#confettiLayer");
   const activeBlocks = [];
   const blockElements = new Map();
+  const gameState = {
+    mode: "sandbox",
+    difficulty: null,
+    target: null,
+    timeLimit: 0,
+    timerDeadline: 0,
+    timerFrame: 0,
+    challengeActive: false,
+    targetHistory: [],
+    trayValues: [...SANDBOX_SOURCE_VALUES],
+  };
 
   let activeDrag = null;
   let nextId = 1;
   let topZ = 5;
   let resizeFrame = 0;
+  let audioContext = null;
 
   window.activeBlocks = activeBlocks;
   window.checkVerticalSnap = checkVerticalSnap;
   window.combineBlocks = combineBlocks;
+  window.gameState = gameState;
 
   function configureResponsiveUnit() {
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
@@ -57,7 +105,33 @@
     return Number.parseFloat(raw) || 60;
   }
 
+  function isCompositeValue(value) {
+    return value > 10;
+  }
+
   function getShape(value) {
+    if (isCompositeValue(value)) {
+      if (value >= 100) {
+        return {
+          columns: 3,
+          rows: 1.9,
+          className: "shape-hundred-flat",
+          composite: true,
+          viewWidth: 300,
+          viewHeight: 190,
+        };
+      }
+
+      return {
+        columns: 2.35,
+        rows: 1.3,
+        className: "shape-ten-rod",
+        composite: true,
+        viewWidth: 235,
+        viewHeight: 130,
+      };
+    }
+
     if (value === 4) {
       return { columns: 2, rows: 2, className: "shape-square-2" };
     }
@@ -78,6 +152,8 @@
       unit,
       width: shape.columns * unit,
       height: shape.rows * unit,
+      viewWidth: shape.viewWidth ?? shape.columns * 100,
+      viewHeight: shape.viewHeight ?? shape.rows * 100,
     };
   }
 
@@ -130,15 +206,19 @@
     block.style.height = `${metrics.height}px`;
     block.innerHTML = "";
     block.appendChild(createBodySvg(value, metrics));
-    block.appendChild(createFaceContainer(value, metrics));
+    if (!metrics.composite) {
+      block.appendChild(createFaceContainer(value, metrics));
+    }
   }
 
   function createBodySvg(value, metrics) {
+    if (metrics.composite) {
+      return createCompositeBodySvg(value, metrics);
+    }
+
     const svg = document.createElementNS(SVG_NS, "svg");
-    const viewWidth = metrics.columns * 100;
-    const viewHeight = metrics.rows * 100;
     svg.setAttribute("class", "block-body");
-    svg.setAttribute("viewBox", `0 0 ${viewWidth} ${viewHeight}`);
+    svg.setAttribute("viewBox", `0 0 ${metrics.viewWidth} ${metrics.viewHeight}`);
     svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("xmlns", SVG_NS);
 
@@ -162,6 +242,84 @@
         index += 1;
       }
     }
+
+    return svg;
+  }
+
+  function createCompositeBodySvg(value, metrics) {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    const id = `metal-${value}-${Math.round(metrics.width)}-${Math.round(metrics.height)}`;
+    const majorLines = value >= 100 ? 5 : 4;
+    const minorLines = value >= 100 ? 3 : 2;
+    svg.setAttribute("class", "block-body composite-body");
+    svg.setAttribute("viewBox", `0 0 ${metrics.viewWidth} ${metrics.viewHeight}`);
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("xmlns", SVG_NS);
+
+    const defs = document.createElementNS(SVG_NS, "defs");
+    defs.innerHTML = `
+      <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff" />
+        <stop offset="52%" stop-color="#dce5ef" />
+        <stop offset="100%" stop-color="#f8fbff" />
+      </linearGradient>
+    `;
+    svg.appendChild(defs);
+
+    const rect = document.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", "3");
+    rect.setAttribute("y", "3");
+    rect.setAttribute("width", String(metrics.viewWidth - 6));
+    rect.setAttribute("height", String(metrics.viewHeight - 6));
+    rect.setAttribute("rx", "16");
+    rect.setAttribute("fill", `url(#${id})`);
+    rect.setAttribute("stroke", "rgba(22, 42, 66, 0.35)");
+    rect.setAttribute("stroke-width", "3");
+    svg.appendChild(rect);
+
+    for (let column = 1; column < majorLines; column += 1) {
+      const line = document.createElementNS(SVG_NS, "line");
+      const x = (metrics.viewWidth / majorLines) * column;
+      line.setAttribute("x1", String(x));
+      line.setAttribute("x2", String(x));
+      line.setAttribute("y1", "10");
+      line.setAttribute("y2", String(metrics.viewHeight - 10));
+      line.setAttribute("stroke", "rgba(74, 99, 132, 0.16)");
+      line.setAttribute("stroke-width", "2");
+      svg.appendChild(line);
+    }
+
+    for (let row = 1; row < minorLines; row += 1) {
+      const line = document.createElementNS(SVG_NS, "line");
+      const y = (metrics.viewHeight / minorLines) * row;
+      line.setAttribute("x1", "10");
+      line.setAttribute("x2", String(metrics.viewWidth - 10));
+      line.setAttribute("y1", String(y));
+      line.setAttribute("y2", String(y));
+      line.setAttribute("stroke", "rgba(74, 99, 132, 0.16)");
+      line.setAttribute("stroke-width", "2");
+      svg.appendChild(line);
+    }
+
+    const shine = document.createElementNS(SVG_NS, "path");
+    shine.setAttribute("d", `M 18 24 C ${metrics.viewWidth * 0.36} 4 ${metrics.viewWidth * 0.66} 8 ${metrics.viewWidth - 18} 28`);
+    shine.setAttribute("stroke", "rgba(255, 255, 255, 0.82)");
+    shine.setAttribute("stroke-width", "8");
+    shine.setAttribute("stroke-linecap", "round");
+    shine.setAttribute("fill", "none");
+    svg.appendChild(shine);
+
+    const text = document.createElementNS(SVG_NS, "text");
+    text.setAttribute("class", "composite-digit");
+    text.setAttribute("x", String(metrics.viewWidth / 2));
+    text.setAttribute("y", String(metrics.viewHeight / 2 + metrics.viewHeight * 0.14));
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", value >= 100 ? "76" : "66");
+    text.setAttribute("fill", "#132136");
+    text.setAttribute("stroke", "rgba(255, 255, 255, 0.65)");
+    text.setAttribute("stroke-width", "3");
+    text.textContent = String(value);
+    svg.appendChild(text);
 
     return svg;
   }
@@ -221,17 +379,19 @@
 
   function renderTray() {
     trayLane.innerHTML = "";
+    const sourceValues = gameState.trayValues;
     const laneWidth = trayLane.clientWidth || 720;
     const laneHeight = trayLane.clientHeight || 110;
-    const columns = laneWidth < 620 ? 5 : SOURCE_VALUES.length;
-    const rows = Math.ceil(SOURCE_VALUES.length / columns);
+    const columns = laneWidth < 620 ? Math.min(5, sourceValues.length) : sourceValues.length;
+    const rows = Math.ceil(sourceValues.length / columns);
     const gap = laneWidth < 620 ? 8 : 10;
     const cellWidth = Math.max(36, Math.floor((laneWidth - gap * (columns - 1)) / columns));
     const cellHeight = Math.max(42, Math.floor((laneHeight - gap * (rows - 1)) / rows));
     const visualWidth = Math.max(24, cellWidth - 16);
     const visualHeight = Math.max(20, cellHeight - 40);
+    trayLane.style.setProperty("--tray-columns", String(columns));
 
-    for (const value of SOURCE_VALUES) {
+    for (const value of sourceValues) {
       const shape = getShape(value);
       const previewUnit = Math.max(
         4,
@@ -242,16 +402,32 @@
         )
       );
       const source = document.createElement("button");
+      const blocked = isTrayValueBlocked(value);
       source.className = "tray-source";
       source.type = "button";
       source.dataset.value = String(value);
-      source.setAttribute("aria-label", `Spawn Numberblock ${value}`);
+      source.disabled = blocked;
+      source.setAttribute(
+        "aria-label",
+        blocked
+          ? `Build ${value} from other blocks`
+          : `Spawn block ${value}`
+      );
       source.appendChild(createNumberblockElement(value, {
         preview: true,
         unitOverride: previewUnit,
       }));
       trayLane.appendChild(source);
     }
+  }
+
+  function isTrayValueBlocked(value) {
+    return (
+      gameState.mode === "time" &&
+      gameState.difficulty === "easy" &&
+      gameState.challengeActive &&
+      gameState.target === value
+    );
   }
 
   function spawnBlock(value, x, y, options = {}) {
@@ -391,7 +567,7 @@
 
   function handleTrayPointerDown(event) {
     const source = event.target.closest(".tray-source");
-    if (!source || activeDrag) {
+    if (!source || source.disabled || activeDrag) {
       return;
     }
 
@@ -503,21 +679,77 @@
     return bestMatch;
   }
 
+  function checkGridSnap(draggedBlock) {
+    const verticalMatch = checkVerticalSnap(draggedBlock);
+    let bestMatch = verticalMatch ? { ...verticalMatch, direction: "vertical" } : null;
+    let bestScore = verticalMatch
+      ? verticalMatch.verticalGap + verticalMatch.horizontalOffset
+      : Number.POSITIVE_INFINITY;
+    const draggedCenterY = draggedBlock.y + draggedBlock.height / 2;
+
+    for (const target of activeBlocks) {
+      if (target.id === draggedBlock.id) {
+        continue;
+      }
+
+      const targetCenterY = target.y + target.height / 2;
+      const verticalOffset = Math.abs(draggedCenterY - targetCenterY);
+      const leftGap = Math.abs(draggedBlock.x - (target.x + target.width));
+      const rightGap = Math.abs((draggedBlock.x + draggedBlock.width) - target.x);
+
+      if (verticalOffset < SNAP_THRESHOLD && leftGap < SNAP_THRESHOLD) {
+        const score = verticalOffset + leftGap;
+        if (score < bestScore) {
+          bestScore = score;
+          bestMatch = {
+            target,
+            x: target.x + target.width,
+            y: targetCenterY - draggedBlock.height / 2,
+            verticalGap: verticalOffset,
+            horizontalOffset: leftGap,
+            direction: "horizontal",
+          };
+        }
+      }
+
+      if (verticalOffset < SNAP_THRESHOLD && rightGap < SNAP_THRESHOLD) {
+        const score = verticalOffset + rightGap;
+        if (score < bestScore) {
+          bestScore = score;
+          bestMatch = {
+            target,
+            x: target.x - draggedBlock.width,
+            y: targetCenterY - draggedBlock.height / 2,
+            verticalGap: verticalOffset,
+            horizontalOffset: rightGap,
+            direction: "horizontal",
+          };
+        }
+      }
+    }
+
+    return bestMatch;
+  }
+
   async function settleDrop(block, drag) {
-    const snap = checkVerticalSnap(block);
+    const snap = gameState.mode === "time"
+      ? checkGridSnap(block)
+      : checkVerticalSnap(block);
 
     if (!snap) {
+      checkWinCondition();
       return;
     }
 
     const combinedValue = block.value + snap.target.value;
-    if (combinedValue > 10) {
+    if (combinedValue > getCombineLimit()) {
       await rejectAndReturn(block, drag.startX, drag.startY);
       return;
     }
 
     await moveWithTransition(block, snap.x, snap.y, "is-snapping", 100, false);
     combineBlocks(block, snap.target);
+    checkWinCondition();
   }
 
   function moveWithTransition(block, x, y, className, duration, shouldClamp = true) {
@@ -528,16 +760,11 @@
     }
 
     element.classList.add("is-settling", className);
-
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => {
-        setBlockPosition(block, x, y, shouldClamp);
-        window.setTimeout(() => {
-          element.classList.remove("is-settling", className);
-          resolve();
-        }, duration);
-      });
-    });
+    setBlockPosition(block, x, y, shouldClamp);
+    window.setTimeout(() => {
+      element.classList.remove("is-settling", className);
+    }, duration);
+    return Promise.resolve();
   }
 
   async function rejectAndReturn(block, startX, startY) {
@@ -547,15 +774,19 @@
     }
 
     element.classList.add("is-rejected", "is-settling");
-    await wait(230);
-    element.classList.remove("is-rejected");
+    window.setTimeout(() => {
+      element.classList.remove("is-rejected");
+    }, 230);
     await moveWithTransition(block, startX, startY, "is-returning", 220);
   }
 
-  function wait(duration) {
-    return new Promise((resolve) => {
-      window.setTimeout(resolve, duration);
-    });
+  function getCombineLimit() {
+    if (gameState.mode !== "time") {
+      return 10;
+    }
+
+    const config = DIFFICULTY_CONFIGS[gameState.difficulty];
+    return config?.combineMax ?? 200;
   }
 
   function combineBlocks(blockA, blockB) {
@@ -567,23 +798,294 @@
     }
 
     const combinedValue = first.value + second.value;
-    if (combinedValue > 10) {
+    if (combinedValue > getCombineLimit()) {
       return null;
     }
 
     const newMetrics = getMetrics(combinedValue);
-    const bottomEdge = Math.max(
-      first.y + first.height,
-      second.y + second.height
-    );
-    const centerX = second.x + second.width / 2;
-    const nextX = centerX - newMetrics.width / 2;
-    const nextY = bottomEdge - newMetrics.height;
+    let nextX;
+    let nextY;
+
+    if (gameState.mode === "time") {
+      const minX = Math.min(first.x, second.x);
+      const minY = Math.min(first.y, second.y);
+      const maxX = Math.max(first.x + first.width, second.x + second.width);
+      const maxY = Math.max(first.y + first.height, second.y + second.height);
+      nextX = (minX + maxX) / 2 - newMetrics.width / 2;
+      nextY = (minY + maxY) / 2 - newMetrics.height / 2;
+    } else {
+      const bottomEdge = Math.max(
+        first.y + first.height,
+        second.y + second.height
+      );
+      const centerX = second.x + second.width / 2;
+      nextX = centerX - newMetrics.width / 2;
+      nextY = bottomEdge - newMetrics.height;
+    }
 
     removeBlock(first.id);
     removeBlock(second.id);
 
     return spawnBlock(combinedValue, nextX, nextY, { celebrate: true });
+  }
+
+  function setGalaxyMode(enabled) {
+    document.body.classList.toggle("galaxy-mode", enabled);
+    themeToggle.setAttribute(
+      "aria-label",
+      enabled ? "Switch to Day Mode" : "Switch to Galaxy Dark Mode"
+    );
+
+    try {
+      localStorage.setItem("numberblocks-galaxy-mode", enabled ? "1" : "0");
+    } catch {
+      // Private browsing can disable storage; the toggle still works for this page.
+    }
+  }
+
+  function initializeTheme() {
+    let storedValue = "0";
+    try {
+      storedValue = localStorage.getItem("numberblocks-galaxy-mode") || "0";
+    } catch {
+      storedValue = "0";
+    }
+
+    setGalaxyMode(storedValue === "1");
+  }
+
+  function showDifficultyChoices() {
+    modeHome.hidden = true;
+    difficultyPanel.hidden = false;
+  }
+
+  function showModeChoices() {
+    modeHome.hidden = false;
+    difficultyPanel.hidden = true;
+  }
+
+  function hideModeOverlay() {
+    modeOverlay.hidden = true;
+  }
+
+  function startSandboxMode() {
+    cancelTimer();
+    gameState.mode = "sandbox";
+    gameState.difficulty = null;
+    gameState.target = null;
+    gameState.challengeActive = false;
+    gameState.trayValues = [...SANDBOX_SOURCE_VALUES];
+    challengeHud.hidden = true;
+    resetSandbox();
+    renderTray();
+    hideModeOverlay();
+  }
+
+  function startTimeAttack(difficulty) {
+    const config = DIFFICULTY_CONFIGS[difficulty];
+    if (!config) {
+      return;
+    }
+
+    ensureAudioContext();
+    gameState.mode = "time";
+    gameState.difficulty = difficulty;
+    gameState.targetHistory = [];
+    gameState.trayValues = [...config.trayValues];
+    challengeHud.hidden = false;
+    renderTray();
+    hideModeOverlay();
+    startNewTarget();
+  }
+
+  function startNewTarget() {
+    const config = DIFFICULTY_CONFIGS[gameState.difficulty];
+    if (!config) {
+      return;
+    }
+
+    cancelTimer();
+    resetSandbox();
+    gameState.target = generateTarget(config);
+    gameState.timeLimit = config.duration;
+    gameState.timerDeadline = performance.now() + config.duration * 1000;
+    gameState.challengeActive = true;
+    targetBubble.textContent = `Make the number: ${gameState.target}!`;
+    targetBubble.classList.remove("is-won");
+    timerFill.style.width = "100%";
+    renderTray();
+    updateTimer();
+  }
+
+  function generateTarget(config) {
+    let target = config.minTarget;
+    let attempts = 0;
+
+    do {
+      target = randomInt(config.minTarget, config.maxTarget);
+      attempts += 1;
+    } while (
+      gameState.targetHistory.includes(target) &&
+      attempts < 8
+    );
+
+    gameState.targetHistory.push(target);
+    if (gameState.targetHistory.length > 6) {
+      gameState.targetHistory.shift();
+    }
+
+    return target;
+  }
+
+  function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function cancelTimer() {
+    if (gameState.timerFrame) {
+      cancelAnimationFrame(gameState.timerFrame);
+      gameState.timerFrame = 0;
+    }
+  }
+
+  function updateTimer() {
+    if (gameState.mode !== "time" || !gameState.challengeActive) {
+      return;
+    }
+
+    const remaining = Math.max(0, gameState.timerDeadline - performance.now());
+    const ratio = clamp(remaining / (gameState.timeLimit * 1000), 0, 1);
+    timerFill.style.width = `${ratio * 100}%`;
+
+    if (remaining <= 0) {
+      handleTimerExpired();
+      return;
+    }
+
+    gameState.timerFrame = requestAnimationFrame(updateTimer);
+  }
+
+  function handleTimerExpired() {
+    gameState.challengeActive = false;
+    cancelTimer();
+    targetBubble.textContent = "New number coming!";
+    window.setTimeout(() => {
+      if (gameState.mode === "time" && !gameState.challengeActive) {
+        startNewTarget();
+      }
+    }, 900);
+  }
+
+  function checkWinCondition() {
+    if (
+      gameState.mode !== "time" ||
+      !gameState.challengeActive ||
+      gameState.target === null
+    ) {
+      return;
+    }
+
+    const winningBlock = activeBlocks.find((block) => block.value === gameState.target);
+    if (!winningBlock) {
+      return;
+    }
+
+    triggerWinSequence(winningBlock);
+  }
+
+  function triggerWinSequence(winningBlock) {
+    const target = gameState.target;
+    gameState.challengeActive = false;
+    cancelTimer();
+    timerFill.style.width = "100%";
+    targetBubble.textContent = `Great! ${target}!`;
+    targetBubble.classList.add("is-won");
+
+    const element = blockElements.get(winningBlock.id);
+    if (element) {
+      element.classList.add("is-celebrating");
+      window.setTimeout(() => element.classList.remove("is-celebrating"), 520);
+    }
+
+    burstConfetti(winningBlock);
+    playCelebrateSound();
+
+    window.setTimeout(() => {
+      if (gameState.mode === "time" && !gameState.challengeActive && gameState.target === target) {
+        startNewTarget();
+      }
+    }, 1250);
+  }
+
+  function burstConfetti(block) {
+    const sandboxRect = sandbox.getBoundingClientRect();
+    const originX = sandboxRect.left + block.x + block.width / 2;
+    const originY = sandboxRect.top + block.y + block.height / 2;
+    const colors = ["#FF1A1A", "#FF8000", "#FFFF00", "#00CC00", "#3399FF", "#8A3FFC"];
+
+    for (let index = 0; index < 34; index += 1) {
+      const piece = document.createElement("div");
+      const angle = (Math.PI * 2 * index) / 34;
+      const distance = randomInt(90, 230);
+      piece.className = "confetti-piece";
+      piece.style.left = `${originX}px`;
+      piece.style.top = `${originY}px`;
+      piece.style.background = colors[index % colors.length];
+      piece.style.setProperty("--tx", `${Math.cos(angle) * distance}px`);
+      piece.style.setProperty("--ty", `${Math.sin(angle) * distance + randomInt(120, 230)}px`);
+      piece.style.setProperty("--spin", `${randomInt(220, 760)}deg`);
+      confettiLayer.appendChild(piece);
+      window.setTimeout(() => piece.remove(), 980);
+    }
+  }
+
+  function ensureAudioContext() {
+    if (!audioContext) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        return null;
+      }
+      audioContext = new AudioContextClass();
+    }
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
+    return audioContext;
+  }
+
+  function playCelebrateSound() {
+    const context = ensureAudioContext();
+    if (!context) {
+      return;
+    }
+
+    const now = context.currentTime;
+    const notes = [523.25, 659.25, 783.99];
+
+    notes.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, now + index * 0.08);
+      gain.gain.setValueAtTime(0.0001, now + index * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + index * 0.08 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.08 + 0.26);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(now + index * 0.08);
+      oscillator.stop(now + index * 0.08 + 0.28);
+    });
+  }
+
+  function handleReset() {
+    if (gameState.mode === "time") {
+      startNewTarget();
+      return;
+    }
+
+    resetSandbox();
   }
 
   function syncLayoutToViewport() {
@@ -630,8 +1132,32 @@
   document.addEventListener("touchmove", preventBrowserGesture, { passive: false });
   document.addEventListener("gesturestart", preventBrowserGesture, { passive: false });
   document.addEventListener("dblclick", preventBrowserGesture, { passive: false });
-  resetButton.addEventListener("click", resetSandbox);
+  resetButton.addEventListener("click", handleReset);
+  themeToggle.addEventListener("click", () => {
+    setGalaxyMode(!document.body.classList.contains("galaxy-mode"));
+  });
+  modeOverlay.addEventListener("click", (event) => {
+    const modeButton = event.target.closest("[data-mode]");
+    const difficultyButton = event.target.closest("[data-difficulty]");
 
+    if (modeButton?.dataset.mode === "sandbox") {
+      startSandboxMode();
+      return;
+    }
+
+    if (modeButton?.dataset.mode === "time") {
+      showDifficultyChoices();
+      return;
+    }
+
+    if (difficultyButton) {
+      startTimeAttack(difficultyButton.dataset.difficulty);
+    }
+  });
+  backToModesButton.addEventListener("click", showModeChoices);
+
+  initializeTheme();
+  showModeChoices();
   configureResponsiveUnit();
   renderTray();
 })();

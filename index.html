@@ -9,14 +9,37 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Numberblocks Stack Lab</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=galaxy-time-attack-3" />
   </head>
   <body>
     <div id="app" class="app" aria-label="Numberblocks Stack Lab">
       <header class="top-bar">
         <h1>Numberblocks</h1>
-        <button id="resetButton" class="reset-button" type="button">Reset</button>
+        <div class="top-actions">
+          <button
+            id="themeToggle"
+            class="icon-button theme-toggle"
+            type="button"
+            aria-label="Switch to Galaxy Dark Mode"
+          >
+            <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M 17.5 16.6 C 13.7 17.8 9.8 15.7 8.6 11.9 C 7.8 9.4 8.4 6.8 10.1 4.9 C 6.2 5.7 3.5 9.2 3.8 13.2 C 4.1 17.9 8.2 21.3 12.8 21 C 15.7 20.8 18.2 19.1 19.6 16.7 C 18.9 16.9 18.2 16.9 17.5 16.6 Z" />
+            </svg>
+            <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M 12 2.8 L 12 5.2 M 12 18.8 L 12 21.2 M 2.8 12 L 5.2 12 M 18.8 12 L 21.2 12 M 5.5 5.5 L 7.2 7.2 M 16.8 16.8 L 18.5 18.5 M 18.5 5.5 L 16.8 7.2 M 7.2 16.8 L 5.5 18.5" />
+            </svg>
+          </button>
+          <button id="resetButton" class="reset-button" type="button">Reset</button>
+        </div>
       </header>
+
+      <section id="challengeHud" class="challenge-hud" aria-live="polite" hidden>
+        <div class="timer-track" aria-hidden="true">
+          <div id="timerFill" class="timer-fill"></div>
+        </div>
+        <div id="targetBubble" class="target-bubble">Make the number: 1!</div>
+      </section>
 
       <main id="sandbox" class="sandbox" aria-label="Main sandbox"></main>
 
@@ -24,8 +47,50 @@
         <div id="trayLane" class="tray-lane" aria-label="Block sources"></div>
       </footer>
 
+      <div id="confettiLayer" class="confetti-layer" aria-hidden="true"></div>
+
+      <div
+        id="modeOverlay"
+        class="mode-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modeTitle"
+      >
+        <div class="mode-card">
+          <div id="modeHome" class="mode-panel">
+            <h2 id="modeTitle">Choose a mode</h2>
+            <div class="mode-options">
+              <button class="mode-choice sandbox-choice" type="button" data-mode="sandbox">
+                Sandbox Play
+              </button>
+              <button class="mode-choice time-choice" type="button" data-mode="time">
+                Time Attack
+              </button>
+            </div>
+          </div>
+
+          <div id="difficultyPanel" class="mode-panel" hidden>
+            <h2>Time Attack</h2>
+            <div class="difficulty-options">
+              <button class="difficulty-choice easy" type="button" data-difficulty="easy">
+                <span>Easy</span>
+                <small>Single Digit</small>
+              </button>
+              <button class="difficulty-choice normal" type="button" data-difficulty="normal">
+                <span>Normal</span>
+                <small>2 Digits</small>
+              </button>
+              <button class="difficulty-choice hard" type="button" data-difficulty="hard">
+                <span>Hard</span>
+                <small>Big Numbers</small>
+              </button>
+            </div>
+            <button id="backToModes" class="mode-back" type="button">Back</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <script src="./app.js" defer></script>
+    <script src="./app.js?v=galaxy-time-attack-3" defer></script>
   </body>
 </html>
