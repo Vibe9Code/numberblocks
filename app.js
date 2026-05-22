@@ -177,6 +177,30 @@
     return "rgba(0, 0, 0, 0.28)";
   }
 
+  function lockSvgPaint(element) {
+    element.style.setProperty("color-scheme", "only light", "important");
+    element.style.setProperty("forced-color-adjust", "none", "important");
+  }
+
+  function setLockedPaint(element, property, value) {
+    element.setAttribute(property, value);
+    element.style.setProperty(property, value, "important");
+    lockSvgPaint(element);
+  }
+
+  function lockExistingSvgPaint(svg) {
+    lockSvgPaint(svg);
+    svg.querySelectorAll("*").forEach((element) => {
+      lockSvgPaint(element);
+      ["fill", "stroke", "stop-color"].forEach((property) => {
+        const value = element.getAttribute(property);
+        if (value !== null) {
+          element.style.setProperty(property, value, "important");
+        }
+      });
+    });
+  }
+
   function createNumberblockElement(value, options = {}) {
     const metrics = getMetrics(value, options.unitOverride);
     const block = document.createElement("div");
@@ -221,6 +245,7 @@
     svg.setAttribute("viewBox", `0 0 ${metrics.viewWidth} ${metrics.viewHeight}`);
     svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("xmlns", SVG_NS);
+    lockSvgPaint(svg);
 
     let index = 0;
     for (let row = 0; row < metrics.rows; row += 1) {
@@ -235,8 +260,8 @@
         rect.setAttribute("y", String(row * 100));
         rect.setAttribute("width", "100");
         rect.setAttribute("height", "100");
-        rect.setAttribute("fill", getSegmentFill(value, index));
-        rect.setAttribute("stroke", getSegmentStroke(value));
+        setLockedPaint(rect, "fill", getSegmentFill(value, index));
+        setLockedPaint(rect, "stroke", getSegmentStroke(value));
         rect.setAttribute("stroke-width", "1");
         svg.appendChild(rect);
         index += 1;
@@ -255,6 +280,7 @@
     svg.setAttribute("viewBox", `0 0 ${metrics.viewWidth} ${metrics.viewHeight}`);
     svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("xmlns", SVG_NS);
+    lockSvgPaint(svg);
 
     const defs = document.createElementNS(SVG_NS, "defs");
     defs.innerHTML = `
@@ -272,8 +298,8 @@
     rect.setAttribute("width", String(metrics.viewWidth - 6));
     rect.setAttribute("height", String(metrics.viewHeight - 6));
     rect.setAttribute("rx", "16");
-    rect.setAttribute("fill", `url(#${id})`);
-    rect.setAttribute("stroke", "rgba(22, 42, 66, 0.35)");
+    setLockedPaint(rect, "fill", `url(#${id})`);
+    setLockedPaint(rect, "stroke", "rgba(22, 42, 66, 0.35)");
     rect.setAttribute("stroke-width", "3");
     svg.appendChild(rect);
 
@@ -284,7 +310,7 @@
       line.setAttribute("x2", String(x));
       line.setAttribute("y1", "10");
       line.setAttribute("y2", String(metrics.viewHeight - 10));
-      line.setAttribute("stroke", "rgba(74, 99, 132, 0.16)");
+      setLockedPaint(line, "stroke", "rgba(74, 99, 132, 0.16)");
       line.setAttribute("stroke-width", "2");
       svg.appendChild(line);
     }
@@ -296,17 +322,17 @@
       line.setAttribute("x2", String(metrics.viewWidth - 10));
       line.setAttribute("y1", String(y));
       line.setAttribute("y2", String(y));
-      line.setAttribute("stroke", "rgba(74, 99, 132, 0.16)");
+      setLockedPaint(line, "stroke", "rgba(74, 99, 132, 0.16)");
       line.setAttribute("stroke-width", "2");
       svg.appendChild(line);
     }
 
     const shine = document.createElementNS(SVG_NS, "path");
     shine.setAttribute("d", `M 18 24 C ${metrics.viewWidth * 0.36} 4 ${metrics.viewWidth * 0.66} 8 ${metrics.viewWidth - 18} 28`);
-    shine.setAttribute("stroke", "rgba(255, 255, 255, 0.82)");
+    setLockedPaint(shine, "stroke", "rgba(255, 255, 255, 0.82)");
     shine.setAttribute("stroke-width", "8");
     shine.setAttribute("stroke-linecap", "round");
-    shine.setAttribute("fill", "none");
+    setLockedPaint(shine, "fill", "none");
     svg.appendChild(shine);
 
     const text = document.createElementNS(SVG_NS, "text");
@@ -315,11 +341,12 @@
     text.setAttribute("y", String(metrics.viewHeight / 2 + metrics.viewHeight * 0.14));
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("font-size", value >= 100 ? "76" : "66");
-    text.setAttribute("fill", "#132136");
-    text.setAttribute("stroke", "rgba(255, 255, 255, 0.65)");
+    setLockedPaint(text, "fill", "#132136");
+    setLockedPaint(text, "stroke", "rgba(255, 255, 255, 0.65)");
     text.setAttribute("stroke-width", "3");
     text.textContent = String(value);
     svg.appendChild(text);
+    lockExistingSvgPaint(svg);
 
     return svg;
   }
@@ -358,6 +385,7 @@
     svg.setAttribute("viewBox", "0 0 100 100");
     svg.setAttribute("xmlns", SVG_NS);
     svg.setAttribute("class", "block-face");
+    lockSvgPaint(svg);
     svg.innerHTML = `
       <g class="eyes">
         <circle cx="${eyeLeft}" cy="${eyeY}" r="12" fill="#FFFFFF" stroke="#111111" stroke-width="2.5" />
@@ -373,6 +401,7 @@
         <path d="${mouthPath}" fill="${mouthFill}" stroke="${mouthStroke}" stroke-width="5" stroke-linecap="round" />
       </g>
     `;
+    lockExistingSvgPaint(svg);
 
     return svg;
   }

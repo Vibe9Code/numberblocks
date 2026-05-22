@@ -6,6 +6,8 @@
   --panel: #ffffff;
   --line: rgba(18, 21, 28, 0.16);
   --shadow: 0 12px 28px rgba(39, 64, 94, 0.18);
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
 }
 
 * {
@@ -22,12 +24,14 @@ body {
   width: 100%;
   height: 100%;
   margin: 0;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
 }
 
 body {
   min-height: -webkit-fill-available;
-  background: #bce9ff;
-  color: var(--ink);
+  background: #bce9ff !important;
+  color: var(--ink) !important;
   font-family: ui-rounded, "Avenir Next", "SF Pro Rounded", system-ui, sans-serif;
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
@@ -37,20 +41,35 @@ body {
 
 /* Prevent mobile browsers from auto-inverting the game art in system dark mode. */
 .app,
+#app,
+#app *,
+#app::before,
+#app::after,
+#app *::before,
+#app *::after,
 .sandbox,
 .sandbox-canvas,
+.top-bar,
+.top-actions,
+.icon-button,
+.reset-button,
+.challenge-hud,
+.target-bubble,
 .tray,
 .tray-source,
 .numberblock,
 .numberblock-character,
 .block-body,
 .block-face,
+.composite-body,
 .segment-rect,
 .unit-square {
   color-scheme: only light !important;
   forced-color-adjust: none !important;
 }
 
+svg,
+svg *,
 .block-body,
 .block-body *,
 .block-face,
@@ -58,7 +77,34 @@ body {
 .block-face path,
 .block-face g,
 .block-face * {
+  color-scheme: only light !important;
   forced-color-adjust: none !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  html,
+  body,
+  #app,
+  #app *,
+  #app::before,
+  #app::after,
+  #app *::before,
+  #app *::after,
+  svg,
+  svg * {
+    color-scheme: only light !important;
+    forced-color-adjust: none !important;
+  }
+
+  body:not(.galaxy-mode) {
+    background: #bce9ff !important;
+    color: #12151c !important;
+  }
+
+  .galaxy-mode {
+    background: #0b0b1e !important;
+  }
 }
 
 button {
