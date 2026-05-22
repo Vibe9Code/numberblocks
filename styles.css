@@ -35,6 +35,32 @@ body {
   -webkit-user-select: none;
 }
 
+/* Prevent mobile browsers from auto-inverting the game art in system dark mode. */
+.app,
+.sandbox,
+.sandbox-canvas,
+.tray,
+.tray-source,
+.numberblock,
+.numberblock-character,
+.block-body,
+.block-face,
+.segment-rect,
+.unit-square {
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+}
+
+.block-body,
+.block-body *,
+.block-face,
+.block-face circle,
+.block-face path,
+.block-face g,
+.block-face * {
+  forced-color-adjust: none !important;
+}
+
 button {
   font: inherit;
 }
