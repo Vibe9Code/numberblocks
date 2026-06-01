@@ -49,6 +49,111 @@
     "#4E57FF",
     "#A04CFF",
   ];
+  const TENS_REFERENCE_COLORS = {
+    10: {
+      fill: "#FFFFFF",
+      stroke: "#E2363C",
+      grid: "#E2363C",
+    },
+    20: {
+      fillStart: "#FFF0C8",
+      fillMid: "#F4D596",
+      fillEnd: "#E7BC78",
+      stroke: "#C57C35",
+      grid: "rgba(159, 99, 35, 0.52)",
+      shine: "rgba(255, 246, 218, 0.72)",
+      digit: "#704318",
+    },
+    30: {
+      fillStart: "#F7F3A6",
+      fillMid: "#E6E06D",
+      fillEnd: "#D1CB55",
+      stroke: "#A09A36",
+      grid: "rgba(129, 125, 38, 0.5)",
+      shine: "rgba(255, 255, 202, 0.76)",
+      digit: "#5F5A1C",
+    },
+    40: {
+      fillStart: "#D9F7CE",
+      fillMid: "#B7E9AF",
+      fillEnd: "#8BD583",
+      stroke: "#35B74A",
+      grid: "rgba(38, 151, 58, 0.48)",
+      shine: "rgba(230, 255, 222, 0.76)",
+      digit: "#176A2B",
+    },
+    50: {
+      fillStart: "#C4F1F6",
+      fillMid: "#91D9E3",
+      fillEnd: "#70C4D0",
+      stroke: "#2B7581",
+      grid: "rgba(35, 103, 114, 0.5)",
+      shine: "rgba(220, 255, 255, 0.74)",
+      digit: "#144A56",
+    },
+    60: {
+      fillStart: "#B6A8F3",
+      fillMid: "#967FE6",
+      fillEnd: "#8064D7",
+      stroke: "#5631B7",
+      grid: "rgba(75, 42, 166, 0.52)",
+      shine: "rgba(218, 210, 255, 0.66)",
+      digit: "#2E1A78",
+    },
+    70: {
+      gradientX2: "100%",
+      gradientY2: "0%",
+      gradientStops: [
+        { offset: "0%", color: "#F15358" },
+        { offset: "16%", color: "#F39A42" },
+        { offset: "32%", color: "#F2E65F" },
+        { offset: "49%", color: "#79DC77" },
+        { offset: "66%", color: "#64D6E5" },
+        { offset: "83%", color: "#6E85E8" },
+        { offset: "100%", color: "#A06BE8" },
+      ],
+      stroke: "#7E53AA",
+      grid: "rgba(82, 55, 129, 0.42)",
+      shine: "rgba(255, 255, 255, 0.54)",
+      digit: "#4A2E79",
+    },
+    80: {
+      fillStart: "#F1B7F1",
+      fillMid: "#D987DD",
+      fillEnd: "#C06ACB",
+      stroke: "#7D3F86",
+      grid: "rgba(98, 43, 105, 0.52)",
+      shine: "rgba(255, 222, 255, 0.62)",
+      digit: "#682D73",
+    },
+    90: {
+      fillStart: "#BFCBD0",
+      fillMid: "#8E9EA5",
+      fillEnd: "#63737A",
+      stroke: "#3F4B51",
+      grid: "rgba(45, 56, 61, 0.5)",
+      shine: "rgba(236, 246, 250, 0.58)",
+      digit: "#263238",
+    },
+    100: {
+      fillStart: "#E9A0A8",
+      fillMid: "#D36B76",
+      fillEnd: "#B85865",
+      stroke: "#75323D",
+      grid: "rgba(105, 43, 53, 0.5)",
+      shine: "rgba(255, 212, 216, 0.58)",
+      digit: "#5E2530",
+    },
+  };
+  const DEFAULT_COMPOSITE_COLORS = {
+    fillStart: "#FFFFFF",
+    fillMid: "#DCE5EF",
+    fillEnd: "#F8FBFF",
+    stroke: "rgba(22, 42, 66, 0.35)",
+    grid: "rgba(74, 99, 132, 0.16)",
+    shine: "rgba(255, 255, 255, 0.82)",
+    digit: "#132136",
+  };
 
   const sandbox = document.querySelector("#sandbox");
   const trayLane = document.querySelector("#trayLane");
@@ -78,6 +183,7 @@
 
   let activeDrag = null;
   let nextId = 1;
+  let nextPaintId = 1;
   let topZ = 5;
   let resizeFrame = 0;
   let audioContext = null;
@@ -163,7 +269,7 @@
     }
 
     if (value === 10) {
-      return index === 0 ? "#FF1A1A" : "#FFFFFF";
+      return TENS_REFERENCE_COLORS[10].fill;
     }
 
     return BLOCK_COLORS[value] || "#FFFFFF";
@@ -171,10 +277,14 @@
 
   function getSegmentStroke(value) {
     if (value === 10) {
-      return "#FF1A1A";
+      return TENS_REFERENCE_COLORS[10].stroke;
     }
 
     return "rgba(0, 0, 0, 0.28)";
+  }
+
+  function getCompositeColors(value) {
+    return TENS_REFERENCE_COLORS[value] || DEFAULT_COMPOSITE_COLORS;
   }
 
   function lockSvgPaint(element) {
@@ -273,9 +383,11 @@
 
   function createCompositeBodySvg(value, metrics) {
     const svg = document.createElementNS(SVG_NS, "svg");
-    const id = `metal-${value}-${Math.round(metrics.width)}-${Math.round(metrics.height)}`;
+    const colors = getCompositeColors(value);
+    const id = `composite-fill-${value}-${nextPaintId}`;
     const majorLines = value >= 100 ? 5 : 4;
     const minorLines = value >= 100 ? 3 : 2;
+    nextPaintId += 1;
     svg.setAttribute("class", "block-body composite-body");
     svg.setAttribute("viewBox", `0 0 ${metrics.viewWidth} ${metrics.viewHeight}`);
     svg.setAttribute("preserveAspectRatio", "none");
@@ -283,11 +395,22 @@
     lockSvgPaint(svg);
 
     const defs = document.createElementNS(SVG_NS, "defs");
+    const gradientStops = colors.gradientStops || [
+      { offset: "0%", color: colors.fillStart },
+      { offset: "52%", color: colors.fillMid },
+      { offset: "100%", color: colors.fillEnd },
+    ];
     defs.innerHTML = `
-      <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#ffffff" />
-        <stop offset="52%" stop-color="#dce5ef" />
-        <stop offset="100%" stop-color="#f8fbff" />
+      <linearGradient
+        id="${id}"
+        x1="0%"
+        y1="0%"
+        x2="${colors.gradientX2 || "100%"}"
+        y2="${colors.gradientY2 || "100%"}"
+      >
+        ${gradientStops
+          .map((stop) => `<stop offset="${stop.offset}" stop-color="${stop.color}" />`)
+          .join("")}
       </linearGradient>
     `;
     svg.appendChild(defs);
@@ -299,7 +422,7 @@
     rect.setAttribute("height", String(metrics.viewHeight - 6));
     rect.setAttribute("rx", "16");
     setLockedPaint(rect, "fill", `url(#${id})`);
-    setLockedPaint(rect, "stroke", "rgba(22, 42, 66, 0.35)");
+    setLockedPaint(rect, "stroke", colors.stroke);
     rect.setAttribute("stroke-width", "3");
     svg.appendChild(rect);
 
@@ -310,7 +433,7 @@
       line.setAttribute("x2", String(x));
       line.setAttribute("y1", "10");
       line.setAttribute("y2", String(metrics.viewHeight - 10));
-      setLockedPaint(line, "stroke", "rgba(74, 99, 132, 0.16)");
+      setLockedPaint(line, "stroke", colors.grid);
       line.setAttribute("stroke-width", "2");
       svg.appendChild(line);
     }
@@ -322,14 +445,14 @@
       line.setAttribute("x2", String(metrics.viewWidth - 10));
       line.setAttribute("y1", String(y));
       line.setAttribute("y2", String(y));
-      setLockedPaint(line, "stroke", "rgba(74, 99, 132, 0.16)");
+      setLockedPaint(line, "stroke", colors.grid);
       line.setAttribute("stroke-width", "2");
       svg.appendChild(line);
     }
 
     const shine = document.createElementNS(SVG_NS, "path");
     shine.setAttribute("d", `M 18 24 C ${metrics.viewWidth * 0.36} 4 ${metrics.viewWidth * 0.66} 8 ${metrics.viewWidth - 18} 28`);
-    setLockedPaint(shine, "stroke", "rgba(255, 255, 255, 0.82)");
+    setLockedPaint(shine, "stroke", colors.shine);
     shine.setAttribute("stroke-width", "8");
     shine.setAttribute("stroke-linecap", "round");
     setLockedPaint(shine, "fill", "none");
@@ -341,7 +464,7 @@
     text.setAttribute("y", String(metrics.viewHeight / 2 + metrics.viewHeight * 0.14));
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("font-size", value >= 100 ? "76" : "66");
-    setLockedPaint(text, "fill", "#132136");
+    setLockedPaint(text, "fill", colors.digit);
     setLockedPaint(text, "stroke", "rgba(255, 255, 255, 0.65)");
     text.setAttribute("stroke-width", "3");
     text.textContent = String(value);
