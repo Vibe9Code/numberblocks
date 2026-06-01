@@ -24,7 +24,7 @@
       minTarget: 100,
       maxTarget: 200,
       duration: 120,
-      trayValues: [1, 2, 5, 10, 20, 25, 50, 75, 100, 200],
+      trayValues: [1, 2, 3, 4, 5, 10, 20, 30, 40, 50],
       combineMax: 200,
     },
   };
@@ -52,8 +52,13 @@
   const TENS_REFERENCE_COLORS = {
     10: {
       fill: "#FFFFFF",
+      fillStart: "#FFFFFF",
+      fillMid: "#FFFFFF",
+      fillEnd: "#FFFFFF",
       stroke: "#E2363C",
       grid: "#E2363C",
+      shine: "rgba(255, 255, 255, 0.82)",
+      digit: "#E2363C",
     },
     20: {
       fillStart: "#FFF0C8",
@@ -212,7 +217,15 @@
   }
 
   function isCompositeValue(value) {
-    return value > 10;
+    return value > 10 || usesCompactTimeTen(value);
+  }
+
+  function usesCompactTimeTen(value) {
+    return (
+      value === 10 &&
+      gameState.mode === "time" &&
+      (gameState.difficulty === "normal" || gameState.difficulty === "hard")
+    );
   }
 
   function getShape(value) {
